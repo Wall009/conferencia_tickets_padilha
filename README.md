@@ -23,3 +23,8 @@ Não há usuário, só senha: a senha define o perfil. Mantenha **uma única ins
 - Sem conexão, nada é registrado (som de erro): bipe de novo.
 - A planilha tem códigos que dão acesso a viagens. Não a coloque no repositório. O Excel exportado também contém códigos.
 - O botão Exportar Excel considera somente as **datas** do filtro Período (não horário, PED, resíduo ou placa).
+
+## Instalar no celular (exige HTTPS com certificado válido)
+- iPhone: abra no Safari > Compartilhar > Adicionar à Tela de Início.
+- Android: abra no Chrome > menu ⋮ > Instalar app (ou Adicionar à tela inicial).
+- O app precisa de internet; não há leitura offline.

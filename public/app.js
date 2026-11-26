@@ -114,3 +114,5 @@ $('arquivo').onchange = async () => {
   $('arquivo').value = '';
 };
 api('api/eu').then(r => entrar(r.perfil)).catch(telaLogin);
+
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
