@@ -18,7 +18,8 @@ Não há usuário, só senha: a senha define o perfil. Mantenha **uma única ins
 
 ## Regras
 - Todo ticket bipado precisa estar **Utilizado**; o resto é divergência.
-- **Pendente** = Utilizado ainda não bipado. Na primeira vez inclui os que você já conferiu à mão: use **Uso desde**.
+- **Pendente** = Utilizado ainda não bipado. Na primeira vez inclui os que você já conferiu à mão: use o filtro **Período**.
 - Reimportar atualiza as situações e mantém as leituras. Vouchers ausentes na nova planilha permanecem como estavam.
 - Sem conexão, nada é registrado (som de erro): bipe de novo.
 - A planilha tem códigos que dão acesso a viagens. Não a coloque no repositório. O Excel exportado também contém códigos.
+- O botão Exportar Excel considera somente as **datas** do filtro Período (não horário, PED, resíduo ou placa).

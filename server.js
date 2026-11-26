@@ -15,7 +15,7 @@ const app = express();
 app.set('trust proxy', 1);
 app.use((req, res, next) => {
   res.set({ 'X-Content-Type-Options': 'nosniff', 'X-Frame-Options': 'DENY', 'Referrer-Policy': 'no-referrer',
-    'Content-Security-Policy': "default-src 'self'; img-src 'self' data:; frame-ancestors 'none'" });
+    'Content-Security-Policy': "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; frame-ancestors 'none'" });
   if (req.path.startsWith('/api')) res.set('Cache-Control', 'no-store');
   next();
 });
@@ -132,13 +132,30 @@ async function montarPainel(desde, ate) {
     a.cliente.localeCompare(b.cliente, 'pt-BR') || a.pedido - b.pedido || a.residuo.localeCompare(b.residuo)) };
 }
 
-app.get('/api/painel', todos, rota(async (req, res) => {
-  const p = await montarPainel(dataValida(req.query.desde), dataValida(req.query.ate));
-  const imp = (await db.query('SELECT em, total FROM importacoes ORDER BY id DESC LIMIT 1')).rows[0] || null;
-  res.json({ importacao: imp, totais: { conferidos: p.ok.length, pendentes: p.pendentes.length, divergencias: p.div.length },
-    grupos: p.grupos, divergencias: p.div.map(item),
-    ultimas: (await db.query(`SELECT l.codigo,l.lido_em,l.repeticoes,${SEL} FROM leituras l LEFT JOIN vouchers v USING (codigo)
-      ORDER BY l.lido_em DESC LIMIT 15`)).rows.map(item) });
+// o identificador liga voucher e leitura no navegador sem enviar o código completo
+const ident = c => crypto.createHmac('sha256', SESSION_SECRET).update('id:' + c).digest('base64url').slice(0, 16);
+const SIGLA = { Utilizado: 'U', 'Disponível': 'D', Cancelado: 'C' };
+
+app.get('/api/versao', todos, rota(async (req, res) => {
+  const imp = (await db.query('SELECT id, em, total FROM importacoes ORDER BY id DESC LIMIT 1')).rows[0] || null;
+  const l = (await db.query('SELECT count(*)::int n, COALESCE(sum(repeticoes),0)::int r FROM leituras')).rows[0];
+  res.json({ importacao: imp, leituras: l.n, repeticoes: l.r });
+}));
+
+// [pedido, viagem, cliente, resíduo, código mascarado, situação, uso, placa, observação, id]
+app.get('/api/dados', todos, rota(async (req, res) => {
+  const q = await db.query(`SELECT ${SEL} FROM vouchers v ORDER BY pedido, residuo, viagem`);
+  res.json(q.rows.map(r => {
+    const m = /^Utilizado em (\d{2})\/(\d{2})\/(\d{4}) (\d{2}:\d{2})(?:\s*\|\s*Placa:\s*([^|]*?))?\s*(?:\|\s*(.*))?$/.exec(r.detalhe || '');
+    const obs = m ? m[6] || '' : r.detalhe === 'Aguardando utilização' ? '' : r.detalhe || '';
+    return [r.pedido, r.viagem, r.cliente, r.residuo || '', mascara(r.cod_v), SIGLA[r.situacao] || '?',
+      m ? `${m[3]}-${m[2]}-${m[1]} ${m[4]}` : '', m?.[5] || '', obs, ident(r.cod_v)];
+  }));
+}));
+
+app.get('/api/leituras', todos, rota(async (req, res) => {
+  const q = await db.query(`SELECT l.codigo, l.lido_em, ${SEL} FROM leituras l LEFT JOIN vouchers v USING (codigo) ORDER BY l.lido_em DESC`);
+  res.json(q.rows.map(r => ({ id: ident(r.codigo), codigo: mascara(r.codigo), lido_em: r.lido_em, resultado: classificar(r.cod_v ? r : null) })));
 }));
 
 const ROTULO = { OK: 'Conferido', DISPONIVEL: 'Chegou, mas consta Disponível', CANCELADO: 'Ticket cancelado',

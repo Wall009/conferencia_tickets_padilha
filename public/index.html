@@ -1,25 +1,67 @@
-<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Conferência de Tickets</title><link rel="stylesheet" href="estilo.css"></head><body>
-<header><strong>Conferência de Tickets</strong><button id="sair" hidden>Sair</button></header>
-<main>
-<form id="login" hidden><label for="senha">Senha</label><input id="senha" type="password" autocomplete="current-password" required><button>Entrar</button><p id="erroLogin" class="msg"></p></form>
+<!DOCTYPE html>
+<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Padilha Locação — Painel de Vouchers</title><link rel="stylesheet" href="estilo.css"></head>
+<body>
+<header><img src="logo.png" alt="Padilha Locação"><div><h1>Painel de Vouchers</h1><div class="sub" id="sub"></div></div>
+<div class="topo-b"><button class="fb on" id="exportar" hidden title="O Excel usa somente as datas do filtro Período">Exportar Excel</button><button class="fb on" id="sair" hidden>Sair</button></div></header>
+<form id="login" hidden><label for="senha">Senha</label><input id="senha" type="password" autocomplete="current-password" required><button>Entrar</button><p id="erroLogin" class="msg falha"></p></form>
 <div id="app" hidden>
- <nav id="abas" hidden><button data-aba="bipar" class="ativa">Bipar</button><button data-aba="painel">Painel</button></nav>
- <section id="bipar" hidden>
+<nav class="modos" id="abas" hidden><button class="tab" data-aba="bipar">Bipar</button><button class="tab" data-aba="painel">Painel</button></nav>
+ <section id="bipar" class="leitor" hidden>
   <div id="visor"><video id="video" playsinline muted></video><div id="mira"></div></div>
   <button id="camera" class="grande">Ligar câmera</button>
   <div id="resultado" role="status">Ligue a câmera e aponte para o QR.</div>
   <p>Lidos nesta sessão: <b id="contador">0</b></p>
   <details><summary>QR não lê? Digitar o código</summary><form id="manual"><input id="codigo" autocapitalize="characters" autocomplete="off" placeholder="Código do voucher"><button>Conferir</button></form></details>
  </section>
- <section id="painel" hidden>
-  <p id="status" class="msg"></p>
-  <div id="importar" hidden><label for="arquivo">Importar planilha (.xlsx)</label><input id="arquivo" type="file" accept=".xlsx"><p id="msgImp" class="msg"></p></div>
-  <div class="filtro"><label>Uso desde<input type="date" id="desde"></label><label>até<input type="date" id="ate"></label></div>
-  <button id="exportar" hidden>Exportar Excel</button>
-  <div class="cartoes"><div><b id="tOk">0</b>Conferidos</div><div><b id="tPend">0</b>Pendentes</div><div class="alerta"><b id="tDiv">0</b>Divergências</div></div>
-  <h2>Divergências <small>(todas as datas)</small></h2><div id="divs"></div>
-  <h2>Por cliente e pedido</h2><input id="busca" placeholder="Buscar cliente"><div id="grupos"></div>
-  <h2>Últimas leituras</h2><div id="ultimas"></div>
- </section>
-</div></main><script src="jsqr.js"></script><script src="app.js"></script></body></html>
+<section id="painel" hidden>
+<div class="imp"><span id="importar" hidden><label for="arquivo">Importar planilha: </label><input id="arquivo" type="file" accept=".xlsx"></span><span id="msgImp" class="msg"></span><span id="status" class="msg"></span></div>
+<div class="bar-f">
+  <div class="grp"><label>Horário</label>
+    <button class="fb" data-pre="0-5">Madrugada</button>
+    <button class="fb" data-pre="6-11">Manhã</button>
+    <button class="fb" data-pre="12-17">Tarde</button>
+    <button class="fb" data-pre="18-23">Noite</button>
+    <span style="color:var(--mut);font-size:12px">ou das</span>
+    <select id="h1"></select><span style="color:var(--mut);font-size:12px">às</span><select id="h2"></select>
+  </div>
+  <div class="grp"><label>Período</label>
+    <span style="color:var(--mut);font-size:12px">de</span><input type="date" id="d1"><input type="time" id="t1">
+    <span style="color:var(--mut);font-size:12px">até</span><input type="date" id="d2"><input type="time" id="t2">
+  </div>
+  <div class="grp"><label>PED</label><input type="text" id="ped" list="pedlist" placeholder="Nº do pedido (ex: 3, 45)" style="width:170px;padding:5px 8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)"><datalist id="pedlist"></datalist></div>
+  <div class="grp"><label>Resíduo</label><span id="resChips"></span></div>
+  <div class="grp"><label>Conferência</label><span id="confChips"></span></div>
+  <div class="grp"><span id="plateTag"></span><button class="fb clear" id="clear" style="display:none">✕ Limpar filtros</button></div>
+</div>
+<div class="note" id="note"></div>
+
+<div class="kpis" id="kpis"></div>
+
+<div class="charts">
+  <div class="panel chart"><h3 id="hTitle"></h3><div class="hint">Clique nas barras para filtrar por hora (pode marcar várias)</div><div class="cols" id="hCols"></div><div class="lbls" id="hLbls"></div></div>
+  <div class="panel chart"><h3 id="dTitle"></h3><div class="hint">Clique para filtrar por dia</div><div class="cols" id="dCols"></div><div class="lbls" id="dLbls"></div></div>
+</div>
+
+<div class="tabs">
+  <button class="tab on" data-t="cli">Por cliente</button>
+  <button class="tab" data-t="ped">Todos os pedidos</button>
+  <button class="tab" data-t="div" id="tabDiv">Divergências</button>
+</div>
+<div id="v-cli" class="main">
+  <div class="panel">
+    <div class="ph"><input id="q" placeholder="Buscar cliente…"></div>
+    <div class="list" id="clist"></div>
+  </div>
+  <div class="panel det" id="detail"></div>
+</div>
+<div id="v-ped" class="full" style="display:none">
+  <div class="panel" style="overflow:auto">
+    <div class="ph"><input id="q2" placeholder="Buscar por pedido ou cliente…"></div>
+    <div id="ptable"></div>
+  </div>
+</div>
+<div id="v-div" class="full" style="display:none"><div class="panel" style="overflow:auto"><div class="ph">Mostra todas as datas, sem aplicar os filtros acima.</div><div id="dtable"></div></div></div>
+</section></div>
+<script src="jsqr.js"></script><script src="painel.js"></script><script src="app.js"></script>
+</body></html>

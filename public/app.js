@@ -1,8 +1,5 @@
 const $ = id => document.getElementById(id);
-let perfil = null, timer = null, stream = null, audio = null, ocupado = false, ultimo = '', visto = 0, lidos = 0, dados = null, trava = null;
-const ROT = { OK: 'OK, conferido', DISPONIVEL: 'DIVERGÊNCIA: consta Disponível', CANCELADO: 'DIVERGÊNCIA: ticket cancelado',
-  NAO_ENCONTRADO: 'DIVERGÊNCIA: não está na planilha', SITUACAO_DESCONHECIDA: 'DIVERGÊNCIA: situação desconhecida' };
-
+let perfil = null, timer = null, stream = null, audio = null, ocupado = false, ultimo = '', visto = 0, lidos = 0, trava = null;
 async function api(url, op = {}) {
   const r = await fetch(url, { signal: AbortSignal.timeout(url.includes('importar') ? 90000 : 10000), ...op });
   const j = await r.json().catch(() => ({}));
@@ -12,16 +9,17 @@ async function api(url, op = {}) {
 }
 const post = (u, b) => api(u, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(b) });
 
-function telaLogin() { perfil = null; desligar(); clearTimeout(timer); $('app').hidden = true; $('sair').hidden = true; $('login').hidden = false; }
+function telaLogin() { perfil = null; base = null; versao = ''; $('exportar').hidden = true; desligar(); clearTimeout(timer); $('app').hidden = true; $('sair').hidden = true; $('login').hidden = false; }
 function entrar(p) {
   perfil = p; $('login').hidden = true; $('app').hidden = false; $('sair').hidden = false;
   const op = p === 'operador';
-  $('abas').hidden = !op; $('importar').hidden = !op; $('exportar').hidden = !op;
+  $('sub').textContent = ''; $('abas').hidden = !op; $('importar').hidden = !op; $('exportar').hidden = !op;
   aba(op ? 'bipar' : 'painel');
 }
 function aba(a) {
+  $('exportar').hidden = !(perfil === 'operador' && a === 'painel');
   $('bipar').hidden = a !== 'bipar'; $('painel').hidden = a !== 'painel';
-  document.querySelectorAll('nav button').forEach(b => b.classList.toggle('ativa', b.dataset.aba === a));
+  document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.dataset.aba === a));
   if (a !== 'bipar') desligar();
   clearTimeout(timer); if (a === 'painel') atualizar();
 }
@@ -86,35 +84,27 @@ $('camera').onclick = () => stream ? desligar() : ligar();
 document.addEventListener('visibilitychange', () => { if (document.hidden) desligar(); });
 $('manual').onsubmit = async e => { e.preventDefault(); prepararSom(); if (!ocupado && await conferir($('codigo').value)) $('codigo').value = ''; };
 
-const el = (cls, titulo, sub) => { const d = document.createElement('div'); d.className = 'linha ' + cls; d.textContent = titulo; const s = document.createElement('small'); s.textContent = sub; d.append(s); return d; };
-const linhaLeitura = r => el(r.resultado === 'OK' ? '' : 'ruim', r.cliente ? `${r.cliente} · Pedido ${r.pedido}, viagem ${r.viagem}` : 'Código desconhecido',
-  `${ROT[r.resultado]} · ${r.codigo} · ${new Date(r.lido_em).toLocaleString('pt-BR')}${r.repeticoes ? ` · releituras: ${r.repeticoes}` : ''}`);
-const encher = (id, itens, vazio) => $(id).replaceChildren(...(itens.length ? itens : [el('', vazio, '')]));
-function grupos() {
-  if (!dados) return;
-  const b = $('busca').value.toLowerCase();
-  encher('grupos', dados.grupos.filter(g => g.cliente.toLowerCase().includes(b)).sort((a, c) => !!c.pendentes.length - !!a.pendentes.length)
-    .map(g => el(g.pendentes.length ? 'pend' : '', `${g.cliente} · Pedido ${g.pedido} · ${g.residuo}`,
-      `${g.conferidos} de ${g.conferidos + g.pendentes.length} utilizados conferidos` + (g.pendentes.length ? ` · Pendentes: ${g.pendentes.join(', ')}` : ''))), 'Nada para mostrar.');
-}
-const filtro = () => new URLSearchParams({ desde: $('desde').value, ate: $('ate').value });
-let seq = 0;
+let base = null, baseImp = null, versao = '', seq = 0;
+// a cada 3 s consulta só a versão; a base completa é baixada apenas quando há nova importação
 async function atualizar() {
   clearTimeout(timer); const n = ++seq;
   try {
-    const r = await api('api/painel?' + filtro());
+    const v = await api('api/versao');
     if (n !== seq) return;
-    dados = r;
-    $('tOk').textContent = r.totais.conferidos; $('tPend').textContent = r.totais.pendentes; $('tDiv').textContent = r.totais.divergencias;
+    const chave = JSON.stringify(v);
+    if (chave !== versao) {
+      const imp = v.importacao?.id ?? 0;
+      const b = !base || imp !== baseImp ? await api('api/dados') : base;
+      const l = await api('api/leituras');
+      if (n !== seq || !perfil) return;
+      base = b; baseImp = imp; aplicarDados(base, l); versao = chave;
+    }
     $('status').className = 'msg';
-    $('status').textContent = (r.importacao ? `Planilha: ${new Date(r.importacao.em).toLocaleString('pt-BR')} (${r.importacao.total} vouchers)` : 'Nenhuma planilha importada.') + ` · Atualizado às ${new Date().toLocaleTimeString('pt-BR')}`;
-    encher('divs', r.divergencias.map(linhaLeitura), 'Nenhuma divergência.'); encher('ultimas', r.ultimas.map(linhaLeitura), 'Nenhuma leitura.'); grupos();
+    $('status').textContent = (v.importacao ? `Planilha: ${new Date(v.importacao.em).toLocaleString('pt-BR')} (${v.importacao.total} vouchers)` : 'Nenhuma planilha importada.') + ` · Verificado às ${new Date().toLocaleTimeString('pt-BR')}`;
   } catch (x) { if (n === seq) { $('status').className = 'msg falha'; $('status').textContent = 'Painel desatualizado: sem conexão.'; } }
   if (n === seq && perfil && !$('painel').hidden) timer = setTimeout(atualizar, 3000);
 }
-$('busca').oninput = grupos;
-$('desde').onchange = $('ate').onchange = atualizar;
-$('exportar').onclick = () => { location.href = 'api/exportar?' + filtro(); };
+$('exportar').onclick = () => { location.href = 'api/exportar?' + new URLSearchParams({ desde: $('d1').value, ate: $('d2').value }); };
 $('arquivo').onchange = async () => {
   const f = $('arquivo').files[0]; if (!f) return;
   const m = $('msgImp'); m.className = 'msg'; m.textContent = 'Importando…';
